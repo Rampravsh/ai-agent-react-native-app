@@ -7,27 +7,26 @@
  * - Simple on-click Toast triggers without complex modal logic
  */
 
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
-import { HugeiconsIcon } from '@hugeicons/react-native';
-import {
-  Grid02Icon,
-  Tag01Icon,
-  Notification01Icon,
-  PaintBrush01Icon,
-  ArrowRight01Icon,
-  HelpCircleIcon,
-  Logout01Icon,
-} from '@hugeicons/core-free-icons';
 import { Colors } from '@/constants/colors';
 import { SETTINGS_PLAN_DATA } from '@/constants/dummyData';
 import { showToast } from '@/context/ToastContext';
+import {
+  ArrowRight01Icon,
+  Grid02Icon,
+  HelpCircleIcon,
+  Logout01Icon,
+  Notification01Icon,
+  PaintBrush01Icon,
+  Tag01Icon,
+} from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 export default function SettingsScreen() {
   return (

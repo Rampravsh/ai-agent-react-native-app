@@ -6,21 +6,23 @@
  * - Bottom: Full-width Google Sign-in action button with SVG brand mark & press feedback
  */
 
-import React, { useState } from 'react';
+import { Colors } from '@/constants/colors';
+import { supabase } from "@/lib/supabase";
+import { AiSparklesIcon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import * as Linking from 'expo-linking';
+import { useRouter } from 'expo-router';
+import * as WebBrowser from "expo-web-browser";
+import { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
   ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-import { HugeiconsIcon } from '@hugeicons/react-native';
-import { AiSparklesIcon } from '@hugeicons/core-free-icons';
-import { Colors } from '@/constants/colors';
-import { useRouter } from 'expo-router';
-import { showToast } from '@/context/ToastContext';
 
 /**
  * 4-Color Official Google Brand SVG Icon
@@ -50,9 +52,52 @@ export default function SignInScreen() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleGoogleSignIn = () => {
-    showToast('Signed in successfully');
-    router.replace('/(tabs)/chat' as any);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        router.replace('/(tabs)/chat')
+      }
+    })
+  }, [router])
+
+  const handleGoogleSignIn = async () => {
+    const redirectTo = Linking.createURL('auth/callback')
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+        skipBrowserRedirect: true
+      }
+    })
+
+    if (error) throw error;
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url!, redirectTo)
+
+    if (result.type !== "success") return null
+
+    const params = new URLSearchParams(result.url.split("#")[1])
+    console.log(params)
+    const accessToken = params.get("access_token")
+    const refreshToken = params.get("refresh_token")
+
+    if (!accessToken || !refreshToken) return null
+    const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken
+    })
+
+    if (sessionError) throw sessionError
+
+    if (sessionData.session) {
+      const { data, error } = await supabase
+        .from("users")
+        .upsert({
+          email: sessionData.session.user.email,
+          name: sessionData.session.user.user_metadata.name ?? ""
+        }).select()
+      router.replace('/(tabs)/chat')
+    }
   };
 
   return (
