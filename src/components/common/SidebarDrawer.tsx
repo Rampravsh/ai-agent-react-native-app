@@ -29,9 +29,8 @@ import {
   Edit02Icon,
 } from '@/constants/icons';
 import { Colors } from '@/constants/colors';
-import { SIDE_CHATS } from '@/constants/dummyData';
-import { SideChatItem } from '@/types';
 import { showToast } from '@/context/ToastContext';
+import { useChat } from '@/context/ChatContext';
 
 export interface SidebarDrawerProps {
   /** Visibility state of the drawer modal */
@@ -43,9 +42,9 @@ export interface SidebarDrawerProps {
   /** Callback fired to close the drawer */
   onClose: () => void;
   /** Callback fired when a conversation item is tapped */
-  onSelectChat: (chatTitle: string) => void;
+  onSelectChat?: (chatTitle: string) => void;
   /** Callback fired to initiate a clean chat session */
-  onNewChat: () => void;
+  onNewChat?: () => void;
   /** Callback fired to navigate directly to settings */
   onOpenSettings?: () => void;
   /** Callback fired to clear all side chat topics */
@@ -66,13 +65,15 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   onClearSideChats,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [sideChats] = useState<SideChatItem[]>(SIDE_CHATS);
+  const { threads, activeThread, selectThread, createNewChat } = useChat();
+
+  const mainThread = threads.find((t) => t.type === 'main');
+  const sideThreads = threads.filter((t) => t.type === 'side');
 
   // Filter side chat topics by active search query
-  const filteredChats = sideChats.filter((chat) =>
-    chat.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredChats = sideThreads.filter((chat) =>
+    (chat.title || 'New Chat').toLowerCase().includes(searchQuery.toLowerCase())
   );
-
 
   return (
     <Modal
@@ -106,10 +107,16 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
           {/* Main Chat Capsule Button */}
           <View style={styles.mainChatWrapper}>
             <TouchableOpacity
-              style={styles.mainChatCapsule}
+              style={[
+                styles.mainChatCapsule,
+                activeThread?.type === 'main' && { backgroundColor: Colors.tabActiveBg },
+              ]}
               onPress={() => {
+                if (mainThread) {
+                  selectThread(mainThread.id);
+                }
                 showToast('Main chat');
-                onSelectChat('Main chat');
+                onSelectChat?.('Main chat');
                 onClose();
               }}
               activeOpacity={0.8}>
@@ -147,24 +154,38 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
             </View>
 
             {/* Side Chats List */}
-            {filteredChats.map((chat) => (
-              <TouchableOpacity
-                key={chat.id}
-                style={styles.chatRow}
-                onPress={() => {
-                  showToast(chat.title);
-                  onSelectChat(chat.title);
-                  onClose();
-                }}
-                activeOpacity={0.7}>
-                <Text style={styles.chatRowText} numberOfLines={1}>
-                  {chat.title}
+            {filteredChats.length === 0 ? (
+              <View style={{ paddingVertical: 20, paddingHorizontal: 12 }}>
+                <Text style={{ fontSize: 13, color: Colors.iconMuted }}>
+                  No side chats yet. Tap + to start a new chat.
                 </Text>
-
-                {/* Blue Indicator Dot if unread */}
-                {chat.hasUnreadDot && <View style={styles.blueDot} />}
-              </TouchableOpacity>
-            ))}
+              </View>
+            ) : (
+              filteredChats.map((chat) => {
+                const isActive = activeThread?.id === chat.id;
+                return (
+                  <TouchableOpacity
+                    key={chat.id}
+                    style={[styles.chatRow, isActive && { backgroundColor: '#F0F2F5', borderRadius: 8 }]}
+                    onPress={() => {
+                      selectThread(chat.id);
+                      showToast(chat.title || 'Chat');
+                      onSelectChat?.(chat.title || 'Chat');
+                      onClose();
+                    }}
+                    activeOpacity={0.7}>
+                    <Text
+                      style={[
+                        styles.chatRowText,
+                        isActive && { fontWeight: '600', color: Colors.iconDark },
+                      ]}
+                      numberOfLines={1}>
+                      {chat.title || 'New Chat'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </ScrollView>
 
           {/* Bottom Toolbar: Settings Gear (Left) + Search (Center) + Compose (Right) */}
@@ -207,10 +228,10 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
             {/* New Chat Compose Button */}
             <TouchableOpacity
               style={styles.circleBtn}
-              onPress={() => {
-                showToast('New chat');
+              onPress={async () => {
                 onClose();
-                onNewChat();
+                await createNewChat();
+                onNewChat?.();
               }}
               activeOpacity={0.7}
               accessibilityLabel="New chat">

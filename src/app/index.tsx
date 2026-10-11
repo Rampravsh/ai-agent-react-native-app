@@ -53,12 +53,21 @@ export default function SignInScreen() {
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (data.session) {
-        router.replace('/(tabs)/chat')
+        try {
+          const email = data.session.user.email;
+          if (email) {
+            await supabase.from('user').upsert({
+              email,
+              name: data.session.user.user_metadata?.name ?? email.split('@')[0],
+            }, { onConflict: 'email' });
+          }
+        } catch (_) {}
+        router.replace('/(tabs)/chat');
       }
-    })
-  }, [router])
+    });
+  }, [router]);
 
   const handleGoogleSignIn = async () => {
     const redirectTo = Linking.createURL('auth/callback')
@@ -89,12 +98,15 @@ export default function SignInScreen() {
     if (sessionError) throw sessionError
 
     if (sessionData.session) {
-      const { data, error } = await supabase
-        .from("users")
-        .upsert({
-          email: sessionData.session.user.email,
-          name: sessionData.session.user.user_metadata.name ?? ""
-        }).select()
+      const email = sessionData.session.user.email;
+      if (email) {
+        await supabase
+          .from("user")
+          .upsert({
+            email,
+            name: sessionData.session.user.user_metadata?.name ?? email.split('@')[0],
+          }, { onConflict: 'email' });
+      }
       router.replace('/(tabs)/chat')
     }
   };

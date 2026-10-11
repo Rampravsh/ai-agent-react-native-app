@@ -17,6 +17,27 @@ export interface ChatMessage {
   text: string;
   /** Formatted timestamp display string (e.g. "3:35 PM") */
   timestamp: string;
+  /** Optional metadata */
+  metadata?: Record<string, any>;
+}
+
+export interface ChatThread {
+  id: string;
+  user_email: string;
+  title: string;
+  type: 'main' | 'side';
+  created_at: string;
+  updated?: string;
+}
+
+export interface DbChatMessage {
+  id: string | number;
+  created_at: string;
+  thread_id: string;
+  user_email: string;
+  role: 'user' | 'assistant';
+  content: string;
+  metadata?: Record<string, any>;
 }
 
 /**

@@ -7,37 +7,34 @@
  * - Simple on-click Toast triggers
  */
 
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  Keyboard,
-  TouchableWithoutFeedback,
-  ActivityIndicator,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { HugeiconsIcon } from '@hugeicons/react-native';
+import { Colors } from '@/constants/colors';
 import {
   Add01Icon,
   Mic01Icon,
   SentIcon,
 } from '@/constants/icons';
-import { Colors } from '@/constants/colors';
-import { INITIAL_CHAT_MESSAGES } from '@/constants/dummyData';
-import { ChatMessage } from '@/types';
 import { showToast } from '@/context/ToastContext';
-import { runCooperAgent } from '@/lib/openrouterAiAgent';
+import { useChat } from '@/context/ChatContext';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ChatScreen() {
-  const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_CHAT_MESSAGES);
+  const { messages, isLoading, isFetchingMessages, sendMessage, activeThread } = useChat();
   const [inputText, setInputText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
 
@@ -62,41 +59,8 @@ export default function ChatScreen() {
   const handleSend = async () => {
     const text = inputText.trim();
     if (!text || isLoading) return;
-
-    const userMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      sender: 'user',
-      text,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    const nextMessages = [...messages, userMsg];
-    setMessages(nextMessages);
     setInputText('');
-    setIsLoading(true);
-
-    try {
-      const result = await runCooperAgent({ input: nextMessages });
-      const agentMsg: ChatMessage = {
-        id: `agent-${Date.now()}`,
-        sender: 'agent',
-        text: result.text || "I'm here to help!",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages((prev) => [...prev, agentMsg]);
-    } catch (agentError: any) {
-      console.error('Cooper Agent error:', agentError);
-      showToast('Error getting AI response');
-      const errorMsg: ChatMessage = {
-        id: `err-${Date.now()}`,
-        sender: 'agent',
-        text: 'Sorry, I had trouble connecting. Please check your network and API key.',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
-    } finally {
-      setIsLoading(false);
-    }
+    await sendMessage(text);
   };
 
   return (
@@ -121,6 +85,26 @@ export default function ChatScreen() {
                   <Text style={styles.dateBadgeText}>Today</Text>
                 </View>
               </View>
+
+              {/* Loading historical messages from Supabase */}
+              {isFetchingMessages && (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={Colors.iconMuted} />
+                  <Text style={styles.loadingHistoryText}>Loading conversation...</Text>
+                </View>
+              )}
+
+              {/* Empty state greeting */}
+              {!isFetchingMessages && messages.length === 0 && (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyGreetingTitle}>
+                    {activeThread?.title || 'How can Cooper help?'}
+                  </Text>
+                  <Text style={styles.emptyGreetingSubtitle}>
+                    Ask anything or share a task. Every conversation is automatically saved.
+                  </Text>
+                </View>
+              )}
 
               {/* Messages */}
               {messages.map((msg) => {
@@ -186,7 +170,7 @@ export default function ChatScreen() {
                   scrollViewRef.current?.scrollToEnd({ animated: true });
                 }, 100);
               }}
-              placeholder="Message in Start a health goal"
+              placeholder={activeThread?.title ? `Message in ${activeThread.title}` : 'Message Cooper...'}
               placeholderTextColor={Colors.iconMuted}
               returnKeyType="send"
               onSubmitEditing={handleSend}
@@ -336,5 +320,34 @@ const styles = StyleSheet.create({
   },
   disabledBtn: {
     opacity: 0.7,
+  },
+  loadingContainer: {
+    paddingVertical: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingHistoryText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: Colors.iconMuted,
+  },
+  emptyContainer: {
+    paddingVertical: 48,
+    paddingHorizontal: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyGreetingTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: Colors.iconDark,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  emptyGreetingSubtitle: {
+    fontSize: 14,
+    color: Colors.iconMuted,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

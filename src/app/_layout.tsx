@@ -8,6 +8,7 @@
  */
 
 import { ToastProvider } from '@/context/ToastContext';
+import { ChatProvider } from '@/context/ChatContext';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
@@ -18,12 +19,14 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <ToastProvider>
-        <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="home" options={{ headerShown: false }} />
-        </Stack>
-        <StatusBar style="light" />
+        <ChatProvider>
+          <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="home" options={{ headerShown: false }} />
+          </Stack>
+          <StatusBar style="light" />
+        </ChatProvider>
       </ToastProvider>
     </ThemeProvider>
   );

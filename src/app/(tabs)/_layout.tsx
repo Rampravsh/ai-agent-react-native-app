@@ -33,9 +33,11 @@ import {
   EditAgentModal,
 } from '@/components/common';
 import { showToast } from '@/context/ToastContext';
+import { useChat } from '@/context/ChatContext';
 
 export default function TabLayout() {
   const router = useRouter();
+  const { clearCurrentChat, deleteCurrentChat } = useChat();
 
   // Agent mascot & profile state
   const [agentName, setAgentName] = useState('Cooper');
@@ -189,10 +191,10 @@ export default function TabLayout() {
         onEditAvatar={() => setIsEditAgentOpen(true)}
         onRename={() => setIsEditAgentOpen(true)}
         onClearChat={() => {
-          showToast('Conversation cleared');
+          clearCurrentChat();
         }}
         onDeleteChat={() => {
-          showToast('Chat deleted');
+          deleteCurrentChat();
         }}
         onShareChat={() => {
           showToast('Chat export created');
