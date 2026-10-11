@@ -48,24 +48,37 @@ const GoogleBrandIcon = ({ size = 22 }: { size?: number }) => (
   </Svg>
 );
 
+import { AnimatedSplashScreen } from '@/components/common';
+
 export default function SignInScreen() {
   const [loading, setLoading] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const [hasSession, setHasSession] = useState<boolean | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
-        try {
-          const email = data.session.user.email;
-          if (email) {
-            await supabase.from('user').upsert({
-              email,
-              name: data.session.user.user_metadata?.name ?? email.split('@')[0],
-            }, { onConflict: 'email' });
-          }
-        } catch (_) {}
+        setHasSession(true);
+        // Instant redirect without blocking navigation on network sync
         router.replace('/(tabs)/chat');
+        const email = data.session.user.email;
+        if (email) {
+          (async () => {
+            try {
+              await supabase.from('user').upsert({
+                email,
+                name: data.session.user.user_metadata?.name ?? email.split('@')[0],
+              }, { onConflict: 'email' });
+            } catch (_) {}
+          })();
+        }
+      } else {
+        // User is not signed in
+        setHasSession(false);
       }
+    }).catch(() => {
+      setHasSession(false);
     });
   }, [router]);
 
@@ -112,7 +125,8 @@ export default function SignInScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+    <View style={{ flex: 1 }}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       <View style={styles.content}>
         {/* Center Hero: Muse AI Brand Emblem & Wordmark */}
         <View style={styles.logoWrapper}>
@@ -162,6 +176,15 @@ export default function SignInScreen() {
         </View>
       </View>
     </SafeAreaView>
+
+      {/* Seamless Animated Splash Overlay */}
+      {showSplash && (
+        <AnimatedSplashScreen
+          isReady={hasSession === false}
+          onAnimationComplete={() => setShowSplash(false)}
+        />
+      )}
+    </View>
   );
 }
 
