@@ -27,7 +27,7 @@ import {
   Settings01Icon,
   Search01Icon,
   Edit02Icon,
-} from '@hugeicons/core-free-icons';
+} from '@/constants/icons';
 import { Colors } from '@/constants/colors';
 import { SIDE_CHATS } from '@/constants/dummyData';
 import { SideChatItem } from '@/types';

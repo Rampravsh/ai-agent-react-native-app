@@ -18,7 +18,7 @@ import {
   Notification01Icon,
   PaintBrush01Icon,
   Tag01Icon,
-} from '@hugeicons/core-free-icons';
+} from '@/constants/icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
   ScrollView,

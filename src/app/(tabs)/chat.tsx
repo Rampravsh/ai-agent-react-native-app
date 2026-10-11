@@ -19,6 +19,7 @@ import {
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -26,15 +27,17 @@ import {
   Add01Icon,
   Mic01Icon,
   SentIcon,
-} from '@hugeicons/core-free-icons';
+} from '@/constants/icons';
 import { Colors } from '@/constants/colors';
 import { INITIAL_CHAT_MESSAGES } from '@/constants/dummyData';
 import { ChatMessage } from '@/types';
 import { showToast } from '@/context/ToastContext';
+import { runCooperAgent } from '@/lib/openrouterAiAgent';
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_CHAT_MESSAGES);
   const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
 
@@ -43,7 +46,7 @@ export default function ChatScreen() {
 
   useEffect(() => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
-  }, [messages]);
+  }, [messages, isLoading]);
 
   // Scroll to bottom when keyboard appears
   useEffect(() => {
@@ -56,9 +59,9 @@ export default function ChatScreen() {
     return () => sub.remove();
   }, []);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = inputText.trim();
-    if (!text) return;
+    if (!text || isLoading) return;
 
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
@@ -67,9 +70,33 @@ export default function ChatScreen() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    const nextMessages = [...messages, userMsg];
+    setMessages(nextMessages);
     setInputText('');
-    showToast('Message sent');
+    setIsLoading(true);
+
+    try {
+      const result = await runCooperAgent({ input: nextMessages });
+      const agentMsg: ChatMessage = {
+        id: `agent-${Date.now()}`,
+        sender: 'agent',
+        text: result.text || "I'm here to help!",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, agentMsg]);
+    } catch (agentError: any) {
+      console.error('Cooper Agent error:', agentError);
+      showToast('Error getting AI response');
+      const errorMsg: ChatMessage = {
+        id: `err-${Date.now()}`,
+        sender: 'agent',
+        text: 'Sorry, I had trouble connecting. Please check your network and API key.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -123,6 +150,16 @@ export default function ChatScreen() {
                   </TouchableOpacity>
                 );
               })}
+
+              {/* Cooper Thinking Bubble */}
+              {isLoading && (
+                <View style={[styles.messageRow, styles.agentMessageRow]}>
+                  <View style={[styles.bubble, styles.agentBubble, styles.loadingBubble]}>
+                    <ActivityIndicator size="small" color={Colors.iconDark} style={styles.loadingSpinner} />
+                    <Text style={[styles.bubbleText, styles.agentBubbleText]}>Cooper is thinking...</Text>
+                  </View>
+                </View>
+              )}
             </View>
           </TouchableWithoutFeedback>
         </ScrollView>
@@ -143,6 +180,7 @@ export default function ChatScreen() {
               style={styles.textInput}
               value={inputText}
               onChangeText={setInputText}
+              editable={!isLoading}
               onFocus={() => {
                 setTimeout(() => {
                   scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -154,8 +192,12 @@ export default function ChatScreen() {
               onSubmitEditing={handleSend}
             />
 
-            {/* Right Action: Voice or Send */}
-            {inputText.trim().length > 0 ? (
+            {/* Right Action: Loading Indicator, Send, or Voice */}
+            {isLoading ? (
+              <View style={[styles.circleBtn, styles.sendBtn, styles.disabledBtn]}>
+                <ActivityIndicator size="small" color={Colors.white} />
+              </View>
+            ) : inputText.trim().length > 0 ? (
               <TouchableOpacity
                 style={[styles.circleBtn, styles.sendBtn]}
                 onPress={handleSend}
@@ -283,5 +325,16 @@ const styles = StyleSheet.create({
     color: Colors.iconDark,
     paddingHorizontal: 10,
     paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+  },
+  loadingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  loadingSpinner: {
+    marginRight: 8,
+  },
+  disabledBtn: {
+    opacity: 0.7,
   },
 });

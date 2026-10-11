@@ -10,7 +10,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { MenuTwoLineIcon, MoreHorizontalIcon } from '@hugeicons/core-free-icons';
+import { MenuTwoLineIcon, MoreHorizontalIcon } from '@/constants/icons';
 import { Colors } from '@/constants/colors';
 import MascotAvatar from './MascotAvatar';
 

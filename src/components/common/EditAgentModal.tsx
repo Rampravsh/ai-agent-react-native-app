@@ -21,7 +21,7 @@ import {
   Platform,
 } from 'react-native';
 import { HugeiconsIcon } from '@hugeicons/react-native';
-import { Cancel01Icon, CheckmarkCircle02Icon } from '@hugeicons/core-free-icons';
+import { Cancel01Icon, CheckmarkCircle02Icon } from '@/constants/icons';
 import { Colors } from '@/constants/colors';
 import MascotAvatar from './MascotAvatar';
 import { showToast } from '@/context/ToastContext';

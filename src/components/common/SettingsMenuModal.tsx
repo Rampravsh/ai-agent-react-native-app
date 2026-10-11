@@ -28,7 +28,7 @@ import {
   Share01Icon,
   SparklesIcon,
   RefreshIcon,
-} from '@hugeicons/core-free-icons';
+} from '@/constants/icons';
 import { Colors } from '@/constants/colors';
 import { showToast } from '@/context/ToastContext';
 

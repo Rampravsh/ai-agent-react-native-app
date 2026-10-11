@@ -24,7 +24,7 @@ import {
   Idea01Icon,
   CheckmarkSquare02Icon,
   Settings02Icon,
-} from '@hugeicons/core-free-icons';
+} from '@/constants/icons';
 import { Colors } from '@/constants/colors';
 import {
   AppHeader,

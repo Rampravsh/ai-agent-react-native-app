@@ -21,7 +21,7 @@ import {
   Target01Icon,
   Clock01Icon,
   PlayIcon,
-} from '@hugeicons/core-free-icons';
+} from '@/constants/icons';
 import { Colors } from '@/constants/colors';
 import { TASK_GOALS } from '@/constants/dummyData';
 import { TaskGoalItem } from '@/types';

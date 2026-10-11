@@ -20,6 +20,29 @@ export interface ChatMessage {
 }
 
 /**
+ * Request payload for the chat API route (/api/chat)
+ */
+export interface ChatApiRequestBody {
+  messages?: ChatMessage[];
+  prompt?: string;
+}
+
+/**
+ * Response payload from the chat API route (/api/chat)
+ */
+export interface ChatApiResponse {
+  text: string;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    cost?: number;
+  };
+  durationMs?: number;
+  error?: string;
+}
+
+/**
  * Chat topic item listed under "Side chats" in the sliding sidebar drawer.
  */
 export interface SideChatItem {

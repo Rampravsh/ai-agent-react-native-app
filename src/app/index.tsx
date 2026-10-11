@@ -8,7 +8,7 @@
 
 import { Colors } from '@/constants/colors';
 import { supabase } from "@/lib/supabase";
-import { AiSparklesIcon } from '@hugeicons/core-free-icons';
+import { AiSparklesIcon } from '@/constants/icons';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
@@ -77,7 +77,6 @@ export default function SignInScreen() {
     if (result.type !== "success") return null
 
     const params = new URLSearchParams(result.url.split("#")[1])
-    console.log(params)
     const accessToken = params.get("access_token")
     const refreshToken = params.get("refresh_token")
 
