@@ -149,6 +149,30 @@ export const deleteThread = async (threadId: string): Promise<boolean> => {
 };
 
 /**
+ * Deletes all side threads and their messages for a user
+ */
+export const deleteAllSideThreads = async (userEmail: string): Promise<boolean> => {
+  try {
+    const { data: sideThreads } = await supabase
+      .from('chat_threads')
+      .select('id')
+      .eq('user_email', userEmail)
+      .eq('type', 'side');
+
+    if (sideThreads && sideThreads.length > 0) {
+      const threadIds = sideThreads.map((t) => t.id);
+      await supabase.from('chat_messages').delete().in('thread_id', threadIds);
+      const { error } = await supabase.from('chat_threads').delete().in('id', threadIds);
+      if (error) throw error;
+    }
+    return true;
+  } catch (err) {
+    console.error('Error deleting all side threads:', err);
+    return false;
+  }
+};
+
+/**
  * Saves a single chat message (user or agent) into `chat_messages` table
  */
 export const saveChatMessage = async (

@@ -18,6 +18,7 @@ import {
   ScrollView,
   TextInput,
   Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -65,7 +66,14 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   onClearSideChats,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const { threads, activeThread, selectThread, createNewChat } = useChat();
+  const {
+    threads,
+    activeThread,
+    selectThread,
+    createNewChat,
+    deleteChatById,
+    clearAllSideChats,
+  } = useChat();
 
   const mainThread = threads.find((t) => t.type === 'main');
   const sideThreads = threads.filter((t) => t.type === 'side');
@@ -74,6 +82,67 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   const filteredChats = sideThreads.filter((chat) =>
     (chat.title || 'New Chat').toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Handle single chat deletion with confirmation
+  const handleDeleteChat = (threadId: string, title: string) => {
+    const performDelete = async () => {
+      try {
+        await deleteChatById(threadId);
+      } catch (err) {
+        console.error('SidebarDrawer: Error deleting chat:', err);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm(`Delete "${title}"?`)) {
+        performDelete();
+      }
+    } else {
+      Alert.alert(
+        'Delete Chat',
+        `Are you sure you want to delete "${title}"? This cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: performDelete },
+        ]
+      );
+    }
+  };
+
+  // Handle clearing all side chats with confirmation
+  const handleClearAll = () => {
+    if (sideThreads.length === 0) {
+      showToast('No side chats to clear');
+      return;
+    }
+
+    const performClearAll = async () => {
+      try {
+        await clearAllSideChats();
+        onClearSideChats?.();
+      } catch (err) {
+        console.error('SidebarDrawer: Error clearing all side chats:', err);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (
+        typeof window !== 'undefined' &&
+        window.confirm('Are you sure you want to delete all side chats? This cannot be undone.')
+      ) {
+        performClearAll();
+      }
+    } else {
+      Alert.alert(
+        'Clear Side Chats',
+        'Are you sure you want to delete all side chat conversations? This cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete All', style: 'destructive', onPress: performClearAll },
+        ]
+      );
+    }
+  };
 
   return (
     <Modal
@@ -136,53 +205,74 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionHeaderText}>Side chats</Text>
 
-              <TouchableOpacity
-                style={styles.trashBtn}
-                onPress={() => {
-                  showToast('Side chats cleared');
-                  onClearSideChats?.();
-                }}
-                activeOpacity={0.7}
-                accessibilityLabel="Clear side chats">
-                <HugeiconsIcon
-                  icon={Delete02Icon}
-                  size={20}
-                  color={Colors.iconMuted}
-                  strokeWidth={1.8}
-                />
-              </TouchableOpacity>
+              {sideThreads.length > 0 && (
+                <TouchableOpacity
+                  style={styles.trashBtn}
+                  onPress={handleClearAll}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Clear side chats">
+                  <HugeiconsIcon
+                    icon={Delete02Icon}
+                    size={20}
+                    color={Colors.iconMuted}
+                    strokeWidth={1.8}
+                  />
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Side Chats List */}
             {filteredChats.length === 0 ? (
-              <View style={{ paddingVertical: 20, paddingHorizontal: 12 }}>
-                <Text style={{ fontSize: 13, color: Colors.iconMuted }}>
-                  No side chats yet. Tap + to start a new chat.
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>
+                  {searchQuery.trim()
+                    ? 'No matching conversations'
+                    : 'No side chats yet. Tap + to start a new chat.'}
                 </Text>
               </View>
             ) : (
               filteredChats.map((chat) => {
                 const isActive = activeThread?.id === chat.id;
                 return (
-                  <TouchableOpacity
+                  <View
                     key={chat.id}
-                    style={[styles.chatRow, isActive && { backgroundColor: '#F0F2F5', borderRadius: 8 }]}
-                    onPress={() => {
-                      selectThread(chat.id);
-                      showToast(chat.title || 'Chat');
-                      onSelectChat?.(chat.title || 'Chat');
-                      onClose();
-                    }}
-                    activeOpacity={0.7}>
-                    <Text
-                      style={[
-                        styles.chatRowText,
-                        isActive && { fontWeight: '600', color: Colors.iconDark },
-                      ]}
-                      numberOfLines={1}>
-                      {chat.title || 'New Chat'}
-                    </Text>
-                  </TouchableOpacity>
+                    style={[
+                      styles.chatRowContainer,
+                      isActive && styles.chatRowContainerActive,
+                    ]}>
+                    <TouchableOpacity
+                      style={styles.chatRowMain}
+                      onPress={() => {
+                        selectThread(chat.id);
+                        showToast(chat.title || 'Chat');
+                        onSelectChat?.(chat.title || 'Chat');
+                        onClose();
+                      }}
+                      activeOpacity={0.7}>
+                      <Text
+                        style={[
+                          styles.chatRowText,
+                          isActive && { fontWeight: '600', color: Colors.iconDark },
+                        ]}
+                        numberOfLines={1}>
+                        {chat.title || 'New Chat'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.chatDeleteBtn}
+                      onPress={() => handleDeleteChat(chat.id, chat.title || 'Chat')}
+                      activeOpacity={0.5}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityLabel={`Delete ${chat.title || 'chat'}`}>
+                      <HugeiconsIcon
+                        icon={Delete02Icon}
+                        size={17}
+                        color={Colors.iconMuted}
+                        strokeWidth={1.7}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 );
               })
             )}
@@ -347,19 +437,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chatRow: {
+  emptyContainer: {
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: Colors.iconMuted,
+    textAlign: 'center',
+  },
+  chatRowContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingLeft: 20,
+    paddingRight: 14,
+    paddingVertical: 6,
+    borderRadius: 10,
+    marginHorizontal: 8,
+    marginVertical: 1,
+  },
+  chatRowContainerActive: {
+    backgroundColor: '#F0F2F5',
+  },
+  chatRowMain: {
+    flex: 1,
+    paddingVertical: 6,
+    paddingRight: 8,
   },
   chatRowText: {
     fontSize: 16,
     fontWeight: '400',
     color: Colors.iconDark,
-    flex: 1,
-    paddingRight: 10,
+  },
+  chatDeleteBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
   },
   blueDot: {
     width: 8,

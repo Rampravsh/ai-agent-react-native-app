@@ -180,7 +180,7 @@ export default function TabLayout() {
           router.replace('/(tabs)/settings' as any);
         }}
         onClearSideChats={() => {
-          showToast('Side chats cleared');
+          // Handled within ChatContext and SidebarDrawer
         }}
       />
 

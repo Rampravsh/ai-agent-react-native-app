@@ -19,6 +19,7 @@ import {
   updateThreadTitle,
   deleteThread,
   clearThreadMessages,
+  deleteAllSideThreads,
 } from '@/services/chatHistory';
 import { runCooperAgent } from '@/lib/openrouterAiAgent';
 import { ChatMessage, ChatThread, DbChatMessage } from '@/types';
@@ -37,6 +38,8 @@ interface ChatContextType {
   sendMessage: (text: string) => Promise<void>;
   clearCurrentChat: () => Promise<void>;
   deleteCurrentChat: () => Promise<void>;
+  deleteChatById: (threadId: string) => Promise<void>;
+  clearAllSideChats: () => Promise<void>;
   refreshThreads: () => Promise<void>;
 }
 
@@ -299,6 +302,64 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [activeThread, userEmail, loadThreadMessages]);
 
+  // 10. Delete a specific thread by ID (whether active or inactive)
+  const deleteChatById = useCallback(
+    async (threadId: string) => {
+      if (!userEmail) return;
+
+      try {
+        const isCurrentActive = activeThread?.id === threadId;
+        await deleteThread(threadId);
+        setThreads((prev) => prev.filter((t) => t.id !== threadId));
+
+        if (isCurrentActive) {
+          // Switch back to Main Thread
+          const main = await getMainThread(userEmail);
+          if (main) {
+            setActiveThread(main);
+            await loadThreadMessages(main.id);
+          } else {
+            const newMain = await CreateNewThread(userEmail, 'main', 'Main Chat');
+            setActiveThread(newMain);
+            setMessages([]);
+          }
+        }
+        showToast('Chat deleted');
+      } catch (err) {
+        console.error('ChatContext: Error deleting chat by id:', err);
+        showToast('Failed to delete chat');
+      }
+    },
+    [userEmail, activeThread, loadThreadMessages]
+  );
+
+  // 11. Clear all side chats
+  const clearAllSideChats = useCallback(async () => {
+    if (!userEmail) return;
+
+    try {
+      await deleteAllSideThreads(userEmail);
+      setThreads((prev) => prev.filter((t) => t.type === 'main'));
+
+      // If active thread was a side chat, switch back to Main Thread
+      if (activeThread?.type === 'side') {
+        const main = await getMainThread(userEmail);
+        if (main) {
+          setActiveThread(main);
+          await loadThreadMessages(main.id);
+        } else {
+          const newMain = await CreateNewThread(userEmail, 'main', 'Main Chat');
+          setActiveThread(newMain);
+          setMessages([]);
+        }
+      }
+      showToast('All side chats cleared');
+    } catch (err) {
+      console.error('ChatContext: Error clearing all side chats:', err);
+      showToast('Failed to clear side chats');
+    }
+  }, [userEmail, activeThread, loadThreadMessages]);
+
   return (
     <ChatContext.Provider
       value={{
@@ -314,6 +375,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendMessage,
         clearCurrentChat,
         deleteCurrentChat,
+        deleteChatById,
+        clearAllSideChats,
         refreshThreads,
       }}>
       {children}
