@@ -12,9 +12,13 @@ import {
   Add01Icon,
   Mic01Icon,
   SentIcon,
+  ArrowRight01Icon,
+  SparklesIcon,
 } from '@/constants/icons';
 import { showToast } from '@/context/ToastContext';
 import { useChat } from '@/context/ChatContext';
+import { ChatBrowserPreview } from '@/components/chat/ChatBrowserPreview';
+import { MarkdownMessage } from '@/components/chat/MarkdownMessage';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -35,8 +39,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function ChatScreen() {
   const { messages, isLoading, isFetchingMessages, sendMessage, activeThread } = useChat();
   const [inputText, setInputText] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
+
+  const handleOpenPreview = (url: string) => {
+    setPreviewUrl(url);
+    setIsPreviewOpen(true);
+  };
+
+  const extractUrl = (text: string): string | null => {
+    const match = text.match(/https?:\/\/[^\s"'<>)]+/i);
+    return match ? match[0] : null;
+  };
 
   // Calculate header height offset for iOS KeyboardAvoidingView (SafeAreaView top + AppHeader height)
   const headerOffset = Platform.OS === 'ios' ? insets.top + 98 : 0;
@@ -109,11 +125,13 @@ export default function ChatScreen() {
               {/* Messages */}
               {messages.map((msg) => {
                 const isUser = msg.sender === 'user';
+                const detectedUrl = extractUrl(msg.text);
+                const isBrowserbase = detectedUrl?.includes('browserbase.com');
+                const isStreamingPlaceholder = msg.isStreaming && !msg.text;
+
                 return (
-                  <TouchableOpacity
+                  <View
                     key={msg.id}
-                    activeOpacity={0.8}
-                    onPress={() => showToast(msg.text)}
                     style={[
                       styles.messageRow,
                       isUser ? styles.userMessageRow : styles.agentMessageRow,
@@ -123,23 +141,77 @@ export default function ChatScreen() {
                         styles.bubble,
                         isUser ? styles.userBubble : styles.agentBubble,
                       ]}>
-                      <Text
-                        style={[
-                          styles.bubbleText,
-                          isUser ? styles.userBubbleText : styles.agentBubbleText,
-                        ]}>
-                        {msg.text}
-                      </Text>
+                      {isStreamingPlaceholder ? (
+                        <View style={styles.streamingIndicatorRow}>
+                          <ActivityIndicator
+                            size="small"
+                            color={Colors.primary}
+                            style={{ marginRight: 8 }}
+                          />
+                          <Text style={styles.streamingStatusText}>
+                            {msg.statusMessage || 'Cooper is thinking...'}
+                          </Text>
+                        </View>
+                      ) : (
+                        <>
+                          {Boolean(msg.statusMessage) && (
+                            <View style={styles.liveActivityBadge}>
+                              <ActivityIndicator
+                                size="small"
+                                color={Colors.primary}
+                                style={styles.liveActivitySpinner}
+                              />
+                              <Text style={styles.liveActivityText} numberOfLines={1}>
+                                {msg.statusMessage}
+                              </Text>
+                            </View>
+                          )}
+                          <MarkdownMessage
+                            content={msg.text}
+                            isUser={isUser}
+                            onLinkPress={handleOpenPreview}
+                            isStreaming={msg.isStreaming}
+                          />
+                        </>
+                      )}
+
+                      {/* In-App Browserbase / Web Preview Badge */}
+                      {detectedUrl && !isUser && !isStreamingPlaceholder && (
+                        <TouchableOpacity
+                          style={styles.browserPreviewBadge}
+                          onPress={() => handleOpenPreview(detectedUrl)}
+                          activeOpacity={0.8}>
+                          <View style={styles.browserBadgeLeft}>
+                            <HugeiconsIcon
+                              icon={SparklesIcon}
+                              size={14}
+                              color={Colors.primary}
+                              strokeWidth={2}
+                            />
+                            <Text style={styles.browserBadgeText} numberOfLines={1}>
+                              {isBrowserbase
+                                ? 'Watch Cloud Browser Live'
+                                : 'In-App Web Preview'}
+                            </Text>
+                          </View>
+                          <HugeiconsIcon
+                            icon={ArrowRight01Icon}
+                            size={14}
+                            color={Colors.primary}
+                            strokeWidth={2.2}
+                          />
+                        </TouchableOpacity>
+                      )}
                     </View>
-                  </TouchableOpacity>
+                  </View>
                 );
               })}
 
-              {/* Cooper Thinking Bubble */}
-              {isLoading && (
+              {/* Fallback loading bubble if no streaming message is in list */}
+              {isLoading && !messages.some((m) => m.isStreaming) && (
                 <View style={[styles.messageRow, styles.agentMessageRow]}>
                   <View style={[styles.bubble, styles.agentBubble, styles.loadingBubble]}>
-                    <ActivityIndicator size="small" color={Colors.iconDark} style={styles.loadingSpinner} />
+                    <ActivityIndicator size="small" color={Colors.primary} style={styles.loadingSpinner} />
                     <Text style={[styles.bubbleText, styles.agentBubbleText]}>Cooper is thinking...</Text>
                   </View>
                 </View>
@@ -198,6 +270,15 @@ export default function ChatScreen() {
             )}
           </View>
         </View>
+
+        {/* In-app Browserbase & Webview Preview Modal */}
+        {previewUrl && (
+          <ChatBrowserPreview
+            visible={isPreviewOpen}
+            url={previewUrl}
+            onClose={() => setIsPreviewOpen(false)}
+          />
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -350,4 +431,71 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
+  browserPreviewBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 1,
+      },
+      web: {
+        boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+      },
+    }),
+  },
+  browserBadgeLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  browserBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  streamingIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  streamingStatusText: {
+    fontSize: 14.5,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  liveActivityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  liveActivitySpinner: {
+    transform: [{ scale: 0.65 }],
+    marginRight: 4,
+  },
+  liveActivityText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
 });
+

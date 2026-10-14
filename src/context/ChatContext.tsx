@@ -201,8 +201,18 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
+      const agentMsgId = `agent-${Date.now()}`;
+      const placeholderAgentMsg: ChatMessage = {
+        id: agentMsgId,
+        sender: 'agent',
+        text: '',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isStreaming: true,
+        statusMessage: 'Thinking...',
+      };
+
       const nextMessages = [...messages, userMsg];
-      setMessages(nextMessages);
+      setMessages([...nextMessages, placeholderAgentMsg]);
       setIsLoading(true);
 
       // Async save user message to Supabase
@@ -224,38 +234,90 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
 
+      console.log('==================================================');
+      console.log('[ChatContext] 📨 User sent message:', cleanText);
+      console.log('[ChatContext] 🧵 Active Thread:', activeThread.id, `(${activeThread.title})`);
+      console.log('[ChatContext] ⏳ Invoking runCooperAgent with streaming & total messages:', nextMessages.length);
+
+      let accumulatedText = '';
+
       try {
-        const result = await runCooperAgent({ input: nextMessages });
-        const agentText = result.text || "I'm here to help!";
-
-        const agentMsg: ChatMessage = {
-          id: `agent-${Date.now()}`,
-          sender: 'agent',
-          text: agentText,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          metadata: {
-            usage: result.usage,
-            durationMs: result.durationMs,
+        const result = await runCooperAgent({
+          input: nextMessages,
+          onToolActivity: (activityText: string) => {
+            console.log('[ChatContext] 🛠️ Tool Activity Update:', activityText);
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === agentMsgId
+                  ? { ...m, statusMessage: activityText }
+                  : m
+              )
+            );
           },
-        };
+          onStreamDelta: (delta: string) => {
+            accumulatedText += delta;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === agentMsgId
+                  ? { ...m, text: accumulatedText, statusMessage: undefined }
+                  : m
+              )
+            );
+          },
+        });
 
-        setMessages((prev) => [...prev, agentMsg]);
+        const finalAgentText = (result.text || accumulatedText || "I'm here to help!").trim();
+
+        console.log('[ChatContext] ✅ Agent response received successfully!');
+        console.log('[ChatContext] 📝 Response length:', finalAgentText.length);
+        console.log('[ChatContext] ⏱️ Duration:', `${result.durationMs}ms`);
+        console.log('==================================================');
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === agentMsgId
+              ? {
+                  ...m,
+                  text: finalAgentText,
+                  isStreaming: false,
+                  statusMessage: undefined,
+                  metadata: {
+                    usage: result.usage,
+                    durationMs: result.durationMs,
+                  },
+                }
+              : m
+          )
+        );
 
         // Save agent response to Supabase
-        await saveChatMessage(activeThread.id, userEmail, 'assistant', agentText, {
+        await saveChatMessage(activeThread.id, userEmail, 'assistant', finalAgentText, {
           usage: result.usage,
           durationMs: result.durationMs,
         });
       } catch (agentError: any) {
-        console.error('Cooper Agent error:', agentError);
+        console.error('==================================================');
+        console.error('[ChatContext] ❌ Cooper Agent encountered an error:', {
+          message: agentError?.message,
+          status: agentError?.status,
+          stack: agentError?.stack,
+          error: agentError,
+        });
+        console.error('==================================================');
         showToast('Error getting AI response');
-        const errorMsg: ChatMessage = {
-          id: `err-${Date.now()}`,
-          sender: 'agent',
-          text: 'Sorry, I had trouble connecting. Please check your network and API key.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-        setMessages((prev) => [...prev, errorMsg]);
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === agentMsgId
+              ? {
+                  ...m,
+                  isStreaming: false,
+                  statusMessage: undefined,
+                  text: `Sorry, I had trouble connecting: ${agentError?.message || 'Please check network and API keys.'}`,
+                }
+              : m
+          )
+        );
       } finally {
         setIsLoading(false);
       }

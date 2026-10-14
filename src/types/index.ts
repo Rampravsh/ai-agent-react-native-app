@@ -19,6 +19,10 @@ export interface ChatMessage {
   timestamp: string;
   /** Optional metadata */
   metadata?: Record<string, any>;
+  /** Indicates whether the response is currently streaming in real-time */
+  isStreaming?: boolean;
+  /** Transient status/activity text like "Searching the web...", "Reading Flipkart..." */
+  statusMessage?: string;
 }
 
 export interface ChatThread {
